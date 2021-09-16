@@ -21,4 +21,6 @@ I agree that the double-pie is a creatively pretty way of looking at sub-proport
 
 This code is very "ticky", by which I mean there is a lot of difficult detail that it would be easy to get wrong. Where did you get the data? You should start from there and make a nice, readable table and use R tools to read the data. It would also be nice to try to make a plot like this in a ggplot framework; you might start with some sort of bar chart instead of a pie chart
 
+A good example of why to use code instead of typing ticky details: the very first number you calculate (51) is wrong (should be 61). It is very hard to read this code to find out what you did or to see what mistakes might be there.
+
 Grade: 2.4/3
