@@ -75,4 +75,4 @@ image_write_gif(animation, 'animation.gif')
 
 ## BMB: the graphs on this page are nice, but (1) I don't think you get (much) extra credit simply for pointing it out; (2) it only shows vax coverage, not disease incidence - it would be cool to try to draw analogous plots for COVID-19 (i.e. include both incidence and vaccine coverage in the same graphic. (Strictly speaking to be analogous to Jia You's plot we would only have to include the *start date* of COVID vaccination ...).
 
-## BMB: mark: 2.4/5
+## BMB: mark: 2.4/3
