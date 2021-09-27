@@ -1,0 +1,8 @@
+Table 3. Of Mortality due to Influenza in the United States—An Annualized Regression Approach Using Multiple-Cause Mortality Data
+
+Explain what features of the data you are trying to draw attention to, and what story you think your figures tell (or fail to tell).
+
+
+The feauture of the table 3 that draw me the attention to is the frequncies for death and its comparison with many other types of diseases. 
+The cold in both states have cused many death compare to other types and take into account for majority of proportions (43%) of the total number of deaht in New York as well as 37% of total death at illinois of Indiana. 
+This draws attention for readers of huge surprise and worry in the table.
