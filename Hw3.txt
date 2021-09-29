@@ -1,4 +1,3 @@
-
 library(ggplot2); library(tidyverse); library(forcats)
 library(plotly); library(tidyquant); library(ggrepel); library(plyr)
 
@@ -34,6 +33,9 @@ q21 21 75 4 2 0 0
 q22 17 78 5 1 1 0
 ")
 
+## might use, color choices
+bluecols <- brewer.pal(5, 'Blues')
+
 ## setting of the table with values and names
 rownames(da)<-c(da[,1])
 colnames(da)<-c('ques',4,3,2,1,0)
@@ -61,15 +63,15 @@ p$per[p$per == '0%']<-c('')
 
 # plot as likert type graph
 p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) + 
-  geom_col(width=0.65) + theme_tq()+
+  geom_col(width=0.575) + theme_tq()+
   geom_text(aes(label=ifelse(cases>=2, per, "")), position=position_stack(.5), size=3.25) + ## label big value
   geom_text_repel(aes(label=ifelse(cases<2, per, "")), direction="y", min.segment.length = 0, position=position_stack(.5), size=3.25)+ ## label small values
   coord_flip()+ theme(legend.position='bottom')+ 
-  scale_fill_viridis_d(guide = guide_legend(reverse = TRUE), labels = c('Strongly agree', 
+  scale_fill_manual(values = bluecols, guide = guide_legend(reverse = TRUE), labels = c('Strongly agree', 
         'Agree', 'Niether agree nor disagree', 'Disagree', 'Strongly disagree'))+
   labs(y = "Total number",fill = "Type")+xlab(NULL)
 
 p4
 
-
-
+# save as picture gfile
+ggsave(file='graph_viz.png')
