@@ -1,8 +1,75 @@
-Table 3. Of Mortality due to Influenza in the United States—An Annualized Regression Approach Using Multiple-Cause Mortality Data
 
-Explain what features of the data you are trying to draw attention to, and what story you think your figures tell (or fail to tell).
+library(ggplot2); library(tidyverse); library(forcats)
+library(plotly); library(tidyquant); library(ggrepel); library(plyr)
+
+# https://www.najms.org/article.asp?issn=1947-2714;year=2012;volume=4;issue=9;spage=405;epage=410;aulast=Kumar 
+# title: High satisfaction rating by users of private-for-profit healthcare providers-evidence from a cross-sectional survey among inpatients of a private tertiary level hospital of north India
+
+# table 4.
+
+# table from the paper
+da <- read.table(header=TRUE,text="
+question 4 3 2 1 0 NA
+q1 70 27 3 2 0 0
+q2 8 55 19 17 2 1
+q3 40 47 12 0 1 2
+q4 22 68 7 5 0 0
+q5 40 55 4 3 0 0
+q6 14 55 23 9 0 1
+q7 20 71 7 3 0 1
+q8 28 69 2 1 1 0
+q9 30 71 1 0 0 0
+q10 24 68 10 0 0 0
+q11 49 41 8 3 0 1
+q12 47 50 3 2 0 0 
+q13 32 57 9 3 1 0
+q14 22 74 6 0 0 0
+q15 12 62 22 6 0 0
+q16 35 60 5 1 1 0
+q17 32 67 2 1 0 0
+q18 23 67 8 4 0 0
+q19 17 73 9 1 1 1
+q20 16 69 14 3 0 0
+q21 21 75 4 2 0 0
+q22 17 78 5 1 1 0
+")
+
+## setting of the table with values and names
+rownames(da)<-c(da[,1])
+colnames(da)<-c('ques',4,3,2,1,0)
+head(da)
+
+## separate data and not answered values
+n_a<-da[,7];da<-da[,-7]
+
+## save arrangement of questions
+qq<-rownames(da)
+
+# formulize as table with values arranged
+p<-da %>% 
+  pivot_longer(c(`0`, `1`, `2`, `3`, `4`), names_to = "rating", values_to = "cases")%>%
+  mutate(per=paste0(ceiling(100*cases/102),'%'))%>%
+  arrange(match(ques, qq, desc(rating), desc(cases)))%>%
+  mutate(key = forcats::fct_inorder(ques))
+
+## checkpoint: find if there is any error
+p
+
+## erase unnecessary numbers: 0%
+p$per[p$per == '0%']<-c('')
 
 
-The feauture of the table 3 that draw me the attention to is the frequncies for death and its comparison with many other types of diseases. 
-The cold in both states have cused many death compare to other types and take into account for majority of proportions (43%) of the total number of deaht in New York as well as 37% of total death at illinois of Indiana. 
-This draws attention for readers of huge surprise and worry in the table.
+# plot as likert type graph
+p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) + 
+  geom_col(width=0.65) + theme_tq()+
+  geom_text(aes(label=ifelse(cases>=2, per, "")), position=position_stack(.5), size=3.25) + ## label big value
+  geom_text_repel(aes(label=ifelse(cases<2, per, "")), direction="y", min.segment.length = 0, position=position_stack(.5), size=3.25)+ ## label small values
+  coord_flip()+ theme(legend.position='bottom')+ 
+  scale_fill_viridis_d(guide = guide_legend(reverse = TRUE), labels = c('Strongly agree', 
+        'Agree', 'Niether agree nor disagree', 'Disagree', 'Strongly disagree'))+
+  labs(y = "Total number",fill = "Type")+xlab(NULL)
+
+p4
+
+
+
