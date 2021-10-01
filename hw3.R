@@ -111,11 +111,12 @@ n_aa<-as.data.frame(cbind(da$ques, categ, n_a))
 colnames(n_aa)<-c('question','cate','number')
 
 ## bubble chart for not answered data
-m<-ggplot(n_aa, aes(x = cate, y = fct_inorder(question), size = ifelse(number>0, number, NA)))+ theme_tq() +xlab(NULL)+ ylab(NULL)+
+m<-ggplot(n_aa, aes(x = cate, y = fct_inorder(question), size = number))+ theme_tq() +xlab(NULL)+ ylab(NULL)+
   geom_point() + scale_size_manual(values = c('1'=1.5, '2'=4)) +
   theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank(), legend.position='bottom')+
   labs(title = 'Not answered items')
 m
+
 
 ## combined (not successful)
 library(cowplot)
