@@ -70,7 +70,7 @@ p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) 
   coord_flip()+ theme(legend.position='bottom')+ 
   scale_fill_manual(values = bluecols, guide = guide_legend(reverse = TRUE), labels = c('Strongly disagree', 'Disagree',
       'Niether agree nor disagree', 'Agree', 'Strongly agree'))+
-  labs(y = "Total number",fill = "Type", title = 'Table 4. Overall Ratings')+xlab(NULL)
+  labs(y = "Total number",fill = "Type", title = 'Table 4. Overall Ratings')+ xlab(NULL)
 
 p4
 
@@ -84,13 +84,16 @@ ggsave(file='graph_viz.png')
 # I am trying to visualize the table into stacked bars of proportions for comparisons and an identification for a majority of ratings in the survey. 
 # Notice names of questions are too long to be omitted as q1-q22 in the table.
 # This would give the long tables of numbers into one unified graph in a order of question numbers as same the paper portrays. 
+
 # Moreover, this feature delivers a simple and fast recognition of the raw table for readers to find out a satifaction rate of particular ratings as well as all opinions.
 # The total number of participants is located at the x-axis to find out with close number of 102 participants. 
 # The ratings of legend is located at the bottom and the blue tone colors are chosen manually to convey the comparisons of ratings from worst of strongly disagree to the best ratings of strongly agree.
 # Note the legend is manually ordered as to be consistent with the graph of visual rating colors that portrays from strongly agree to strongly disagree for matching between colors and the legend. 
 # Also, questions are ordered in inorder to notice the first question on the bottom and the last question at the top.
 # This is intended for the case questionaire are not ordered to be changed by the proportion, but to identify question by question from the bottom to the top to compare each question, going through each question. 
-# Using repel function, minority proptions are not overlapped and seen at the end.
+# Using repel function, minority proptions are not overlapped and seen at the end while others are intended to be inscribed in bars.
+# Meanwhile, I find the thin bars (with size 0.575) to be most sophisticated for a view.
+
 # However, some questions with very minor surve ratings (eg. 1%/ 2%) to be stacked together is hard to recognize and find in the plot for the comparison as well as labeling is very perfectly fitted. (Which could be manually labelled or omitted)
 # Furthemore, to preserve the original paper's table where some proportion are round up, the graph is intended to show with the ceiling function to portray the minor proportions. 
 # The unanswered questions are omitted from the stacked proportion to be failed to account with. 
@@ -153,3 +156,13 @@ p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) 
 p4
 
 # In this way, the blue tone for coherent color is changed to be more visually distinct as for readers who want to colors to be different.
+
+
+# More story:
+
+# The graph tells the proportions of questions in a best a way to compare and understand each ratings as well as see the differences of rating proportions for readers. 
+# Also, the visualization is appealing to convey the overview of survey within proportions, as to be appealing for readers.
+# The best overview is the comparisons of proportion within questions and the proportions to compare between questions, where questions are well ordered in order followed from the original questions. 
+# Also, the color and the comparison of blocks are greatly noticeable and distinct to be identified from the plot to deliver for the meanings of opinions of the survey as much possible. 
+# In other words, the overview of complete ratings must deliver within the portray of graph for participant's overall opinions as much as possible and the graph by its characteristics could most suitably inform in terms of stacked proportions.
+
