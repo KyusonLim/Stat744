@@ -1,4 +1,4 @@
-library(ggplot2); library(tidyverse); library(forcats)
+library(ggplot2); library(tidyverse); library(forcats); library(RColorBrewer)
 library(plotly); library(tidyquant); library(ggrepel); library(plyr)
 
 # https://www.najms.org/article.asp?issn=1947-2714;year=2012;volume=4;issue=9;spage=405;epage=410;aulast=Kumar 
