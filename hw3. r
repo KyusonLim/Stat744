@@ -5,6 +5,7 @@ library(plotly); library(tidyquant); library(ggrepel); library(plyr)
 # title: High satisfaction rating by users of private-for-profit healthcare providers-evidence from a cross-sectional survey among inpatients of a private tertiary level hospital of north India
 
 # table 4.
+# Notice names of questions are too long to be omitted as q1-q22 in the table.
 
 # table from the paper
 da <- read.table(header=TRUE,text="
@@ -67,11 +68,87 @@ p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) 
   geom_text(aes(label=ifelse(cases>=2, per, "")), position=position_stack(.5), size=3.25) + ## label big value
   geom_text_repel(aes(label=ifelse(cases<2, per, "")), direction="y", min.segment.length = 0, position=position_stack(.5), size=3.25)+ ## label small values
   coord_flip()+ theme(legend.position='bottom')+ 
-  scale_fill_manual(values = bluecols, guide = guide_legend(reverse = TRUE), labels = c('Strongly agree', 
-        'Agree', 'Niether agree nor disagree', 'Disagree', 'Strongly disagree'))+
-  labs(y = "Total number",fill = "Type")+xlab(NULL)
+  scale_fill_manual(values = bluecols, guide = guide_legend(reverse = TRUE), labels = c('Strongly disagree', 'Disagree',
+      'Niether agree nor disagree', 'Agree', 'Strongly agree'))+
+  labs(y = "Total number",fill = "Type", title = 'Table 4. Overall Ratings')+xlab(NULL)
 
 p4
 
 # save as picture gfile
 ggsave(file='graph_viz.png')
+
+
+
+## Kyuson:comments
+# Notice names of questions are too long to be omitted as q1-q22 in the table.
+# I am trying to visualize the table into stacked bars of proportions for comparisons and an identification for a majority of ratings in the survey. 
+# Notice names of questions are too long to be omitted as q1-q22 in the table.
+# This would give the long tables of numbers into one unified graph in a order of question numbers as same the paper portrays. 
+# Moreover, this feature delivers a simple and fast recognition of the raw table for readers to find out a satifaction rate of particular ratings as well as all opinions.
+# The total number of participants is located at the x-axis to find out with close number of 102 participants. 
+# The ratings of legend is located at the bottom and the blue tone colors are chosen manually to convey the comparisons of ratings from worst of strongly disagree to the best ratings of strongly agree.
+# Also, questions are ordered in inorder to notice the first question on the bottom and the last question at the top.
+# This is intended for the case questionaire are not ordered to be changed by the proportion, but to identify question by question from the bottom to the top to compare each question, going through each question. 
+# Using repel function, minority proptions are not overlapped and seen at the end.
+# However, some questions with very minor surve ratings (eg. 1%/ 2%) to be stacked together is hard to recognize and find in the plot for the comparison as well as labeling is very perfectly fitted. (Which could be manually labelled or omitted)
+# Furthemore, to preserve the original paper's table where some proportion are round up, the graph is intended to show with the ceiling function to portray the minor proportions. 
+# The unanswered questions are omitted from the stacked proportion to be failed to account with. 
+# The not answered pariticipant proportion is omiitted from the graph to visually find at the end of stacked bar as a missing part, but it could raise misunderstanding which I tried to account them into a separate graph to differentiate with survey ratings. 
+# Note that this is intended to differenciate from the survey ratings strictly, where the table from the original paper failed to show with (I think, the paper conveys them in one row which is an misleading for one to find coomplete comparison with).
+# Hence, I tried to creat a buble chart and combine two graphs in one graphs, but the bubble chart does not seem to catch the quantative importance of not answered category to help with. 
+
+
+
+# --------------- additional 'not answered component' ----------------------- #
+
+## agregate values
+categ<-c(rep('Not answered', 22))
+n_aa<-as.data.frame(cbind(da$ques, categ, n_a))
+colnames(n_aa)<-c('question','cate','number')
+
+## bubble chart for not answered data
+m<-ggplot(n_aa, aes(x = cate, y = question, size = number))+ theme_tq() +xlab(NULL)+ ylab(NULL)+
+  geom_point() + scale_size_manual(values = c('1'=1.5, '2'=4)) +
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank(), legend.position='bottom')+
+  labs(title = 'Not answered items')
+m
+
+## combined (not successful)
+library(cowplot)
+plot_grid(p4, m, #labels = c('ratings', 'not answered'),
+              align = "h", rel_widths = c(5,1))
+
+
+
+
+
+# Here, I tried to show with bubble chart for the not answered proportion of questions, by creating a bubble chart to show within a size of bubbles.
+# However, this is a quite a failure for the consistency of quantitive aspect, when combined with stacked bar as a one visualization to show at the end. 
+# Also, the size of bubble does not match with bars and it was failed also for the size of bubble to match with no answer numbers, where 1 and 2 does not seem to differentiate a lot.
+# This portrays failure of the two graphs and no answer proportion to be misleading and quantitatively hard to show as a one visualization with 2 graphs. 
+# Stil at the end of each question, the readers would find out the for the not asnwered participant numbers and match with rest of ratings to find the complete total number of participants. 
+# Also, in this way of combining graph I tried to separate the missing part to be different from ratigns of survey by the participants to convey the opinions and voluntary unanswered proportions.
+# Therefore, I think it is the best to show the just one proportion of stacked ggplot to be consistent and most suitable plot for the paper to substitute, as we still have the unanswered numbers to be omitted and explained to readers in the paper as lines. 
+
+
+
+
+
+
+## --------------- Optional: In the case 'blue tone' colors are not visual to find for the comparison ----------------------- ##
+
+# For the case that the colors are not appealing to find differentiable, the viridis color choices are used to visually find distinct between ratings of the survey. 
+
+
+p4<-ggplot(mapping=aes(x=fct_inorder(key), y=cases, fill=as.factor(rating)), p) + 
+  geom_col(width=0.575) + theme_tq()+
+  geom_text(aes(label=ifelse(cases>=2, per, "")), position=position_stack(.5), size=3.25) + ## label big value
+  geom_text_repel(aes(label=ifelse(cases<2, per, "")), direction="y", min.segment.length = 0, position=position_stack(.5), size=3.25)+ ## label small values
+  coord_flip()+ theme(legend.position='bottom')+ 
+  scale_fill_viridis_d(guide = guide_legend(reverse = TRUE), labels = c('Strongly disagree', 'Disagree',
+                                                                                        'Niether agree nor disagree', 'Agree', 'Strongly agree'))+
+  labs(y = "Total number",fill = "Type", title = 'Table 4. Overall Ratings')+xlab(NULL)
+
+p4
+
+# In this way, the blue tone for coherent color is changed to be more visually distinct as for readers who want to colors to be different.
