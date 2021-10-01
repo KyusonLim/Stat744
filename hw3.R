@@ -87,6 +87,7 @@ ggsave(file='graph_viz.png')
 # Moreover, this feature delivers a simple and fast recognition of the raw table for readers to find out a satifaction rate of particular ratings as well as all opinions.
 # The total number of participants is located at the x-axis to find out with close number of 102 participants. 
 # The ratings of legend is located at the bottom and the blue tone colors are chosen manually to convey the comparisons of ratings from worst of strongly disagree to the best ratings of strongly agree.
+# Note the legend is manually ordered as to be consistent with the graph of visual rating colors that portrays from strongly agree to strongly disagree for matching between colors and the legend. 
 # Also, questions are ordered in inorder to notice the first question on the bottom and the last question at the top.
 # This is intended for the case questionaire are not ordered to be changed by the proportion, but to identify question by question from the bottom to the top to compare each question, going through each question. 
 # Using repel function, minority proptions are not overlapped and seen at the end.
