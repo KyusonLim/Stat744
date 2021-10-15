@@ -166,3 +166,18 @@ p4
 # The best overview is the comparisons of proportion within questions and the proportions to compare between questions, where questions are well ordered in order followed from the original questions. 
 # Also, the color and the comparison of blocks are greatly noticeable and distinct to be identified from the plot to deliver for the meanings of opinions of the survey as much possible. 
 # In other words, the overview of complete ratings must deliver within the portray of graph for participant's overall opinions as much as possible and the graph by its characteristics could most suitably inform in terms of stacked proportions.
+
+## JD comments
+
+Not sure why you have the code at the beginning of the .txt file. I ran it from the R file.
+
+I really like the final visual, and I agree that the No answers can just be left for a textual discussion.
+
+Did you notice that the questions were broken into categories (General, nursing, support)? It would have been good to indicate these in the graph.
+
+If this was for a real paper, I would probably recommend making two- or three-word question summaries and showing them. It would increase readability so much. I don't think that would be worth doing just for a homework, though.
+
+Did you think at all about ordering the questions by some metric of satisfaction? You could nest satisfaction inside category.
+
+Grade 2.2/3
+
