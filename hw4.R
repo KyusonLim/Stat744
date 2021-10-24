@@ -153,7 +153,7 @@ to_numeric<-function(da){
 }
 
 tab[,2]<-to_numeric(tab[,2]);tab[,3]<-to_numeric(tab[,3])
-tab[,4]<-to_numeric(tab[,4]);tab$`Total Deaths`<-to_numeric(tab$`Total Deaths`)
+tab[,4]<-to_numeric(tab[,4]);tab[,5]<-to_numeric(tab[,5])
 
 
 # lat, long
