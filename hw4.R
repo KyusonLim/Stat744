@@ -50,10 +50,6 @@ pa0<-NULL
 lin		### there would be 90 headlines, all printed
 
 
-## this is wordcloud visualization for top 50 words
-wordcloud2(w7,size=2.5,color=c('skyblue'),gridSize=20,shape='circle',ellipticity=0.42)
-
-
 
 # pre-processing:
 lin <- gsub("'", "", lin); lin <- gsub("[[:punct:]]", " ", lin) 
