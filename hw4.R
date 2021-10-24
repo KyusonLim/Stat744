@@ -2,6 +2,12 @@
 # Part 1. Modelling in Text mining for LDA(latent dirichlet distribution) and wordcloud
 # Part 2. Modelling using shiny for COVID-19 death for provinces
 
+# Motivation: In the era of big data, the uncertainty of how much data we can analyze is a question of interest for many people.
+# However, the importance of data mining and the techniques resolves the qustion of interest for many people to comprehend big data by crawling from the internet instantaneously. 
+# It not only enables many people to model the unique qualitative data by text mining (using NLP) but also resolves the quatitative questions by creating a new and rapid interative models. 
+# Now, we are going to look at sophisticated new modelling LDA(latent Dirichlet allocation) for topic modelling about issues of COVID-19 from Statistics Canada website using crawling but also analyze the instantaneous everyday updates of COVID-19 death of each province.
+
+
 rm(list=ls())
 
 ## load the packages that are installed to help you run the coding
@@ -227,4 +233,11 @@ shinyApp(ui, server)
 # However, the qualitative graph of LDA for topic modeling in key words and sub-words explains the impact of COVID-19 to mass media and people for the issues.
 # Combined for both modeling, the model emphasizes the keen and comprehensive understand of on-going hazard information for COVID-19 to people by the method of data mining. 
 
-
+# Conclusion:
+# The crawling of text data enables to comprehend beauty of words data and resolves what issues exist among headlines from the statistics Canada website.
+# Also, the wordcloud delivers for the beauty of frequncies and its intuitive understanding for the issues of various headlines by creating a wordcloud. 
+# However, the LDA suppliment for the MCMC using Gibbs sampling for the topics of headlines by posterior distributions of sampling techniques by creating its own visualization. 
+# Hence, the topic modeling is accurate for its delivery of topics and sub-words of its each own topics. 
+# Moreover, the direct instantaneous delivery of shiny for quantitative modeling on death frequencies also suppliment the importance of data mining where the data could be updated daily.
+# Furthermore, the interactive modeling is unique and complete for its own graph where many things and ideas could be shown by the tool of shiny technology. 
+# Hence, this completes the perfect graphs of data mining and its usage on both qualitative and quantitative data analysis. 
