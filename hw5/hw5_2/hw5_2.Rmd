@@ -1,0 +1,145 @@
+---
+title: "Time series in Bike data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyquant)
+library(tidyverse)
+library(forecast)
+library(highcharter)
+library(gridExtra)
+library(knitr); library(forecast)
+library(ggplot2);library(dygraphs)
+```
+
+## Motivation{-}
+
+I just wonder if there exists any seasonal component in the Bike data. 
+As we could possibly see some trend of seasonality in the prior investigation of TFN model, the curiosity of other data might follow with lead me to apply for the STL decomposition in the number of registered users and Holt-Winter method for filtering. 
+
+
+Hence, I came up to apply for the STL decomposition and Holt Winter method on the data of `registered users`.
+This would be another approach for the investigation of looking at how the time series components for the number of users are commonly used of.
+
+```{r,  echo=T}
+setwd("/Users/kyusoinlims/Desktop/STATS 744")
+#d at<-ts(read.csv(file.choose()))
+dat<-ts(read.csv('day.csv'))
+# count of customers
+Timeline<-seq(as.Date("2011-01-01"), as.Date("2012-12-31"), by='days')
+del.dat =xts(dat[,15], frequency = 7,Timeline)
+
+# Plot for visual inspection
+hc <- highchart(type = "stock") %>%
+        hc_title(text = "Charting stock price") %>%
+        hc_add_series(del.dat)%>%
+        hc_add_theme(hc_theme_flat())
+hc
+```
+
+
+
+## STL:{-}
+
+The Seasonal-Trend Decomposition Procedure Based on Loess (STL) of Cleveland et al. (1990) is widely used by statisticans and econometricians to capture the trend and seasonal components in time series.
+
+
+```{r,  echo=T}
+# seasonality, decomposition
+del.dat =ts(dat[,15], frequency = 7,Timeline)
+plot(stl(del.dat,s.window=35), main="Illustration of classical decomposition using STL")
+```
+
+
+## Holt-Winters’ exponential smoothing and seasonality method: {-}
+
+The Holt-Winters exponential smoothing method has been proposed for more than 50 years and still been used in many business forecasting exercises.
+
+
+The mothly plot of time series data shows that there exists some mean and seasonal shift in the data to actually predict for some meaningful outcomes in appplying the Holt Winter method. 
+
+
+```{r,  echo=T}
+# monethly decomposition
+monthplot(del.dat,main="Monthly plot of Registered users", type="l")
+
+
+# Holt winter method
+fit<-HoltWinters(del.dat)
+fit[c("alpha","beta","gamma")]
+```
+
+The level with $\alpah$ is parametrized by $$l_t = \alpha(Y_t-Y_{t-m})+(1-0.414)(l_{t-1}+b_{t-1}).$$
+
+The trend is parametrized as $$b_t = \beta (l_t-l_{t-1})+(1-\beta)b_{t-1}$$
+but the $\beta=0$ hence we have $b_t = b_{t-1}$ which also indicates that there is no trend in the data to actually find some meaningful conclusion.
+
+The seasonality with $\gamma$ is parametrized as $$s_t = 0.08252082  (Y_t-l_{t-1}-b_{t-1})+(1-0.08252082)s_{t-m}$$
+which means that the monthly seonality to have seen from the plot is valid. 
+
+
+
+```{r,  echo=T}
+# fitted values by HW method
+f<-fit$fitted
+df<-as.data.frame(f)$xhat
+
+
+# count of customers
+Timeline<-seq(as.Date("2011-01-01"), as.Date("2012-12-31"), by='days')
+del.dat =xts(dat[,15], frequency = 7,Timeline)
+
+
+# compare arima model and original data
+Timeline<-seq(as.Date("2011-01-01"), as.Date("2012-12-31"), by='days')
+comb <- cbind(as.vector(del.dat), as.vector(df))
+colnames(comb)<-c('Actual', 'Fitted value')
+comb<-data.frame(Timeline, comb)
+comb = xts(x=comb[,-1], order.by=comb$Timeline)
+dygraph(comb) %>% dyRangeSelector()
+
+```
+
+However, the estimated smooth fit is not perfect at the trend is not suitable for the registered number of users. 
+In other words, from the business perspective we can find the seasonal component for registered users to be prepared but there is no trend to find from the data analysis of time series using Holt-Winter models. 
+
+
+``` {r,  echo=T}
+# forecast by Holt-Winter method
+Timeline<-seq(as.Date("2011-01-01"), as.Date("2013-01-07"), by='days')
+dd<-as.data.frame(forecast(fit))
+dfd<-as.data.frame(c(as.vector(df), dd[,1]))
+combbb<-data.frame(Timeline, dfd)
+combbb = xts(x=combbb[,-1], order.by=combbb$Timeline)
+dygraph(combbb) %>% dyRangeSelector()
+
+
+# formation
+Timeline<-seq(as.Date("2013-01-01"), as.Date("2013-01-07"), by='days')
+dd<-as.data.frame(forecast(fit, h=7))
+combb<-data.frame(Timeline, dd)
+combb = xts(x=combb[,-1], order.by=combb$Timeline)
+
+# forecast point
+round(combb,2)
+```
+
+Note that the forecast is based on the equation $y_t(h) = l_t+b_th+s_{t-m+h}$.
+
+
+
+* __Reference:__ https://www.highcharts.com/blog/tutorials/highcharts-for-r-users/ (highchart in visual inspection)
+
+* __Reference:__ http://www.wessa.net/download/stl.pdf (STL method explained)
+
+* __Reference:__ https://otexts.com/fpp2/holt-winters.html (Holt-Winter method)
+
+* __Reference:__ https://cran.r-project.org/web/packages/perARMA/perARMA.pdf (Periodic ARMA model)
+
+
+
+
+
+
