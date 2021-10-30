@@ -71,7 +71,7 @@ fit<-HoltWinters(del.dat)
 fit[c("alpha","beta","gamma")]
 ```
 
-The level with $\alpah$ is parametrized by $$l_t = \alpha(Y_t-Y_{t-m})+(1-0.414)(l_{t-1}+b_{t-1}).$$
+The level with $\alpha$ is parametrized by $$l_t = \alpha(Y_t-Y_{t-m})+(1-0.414)(l_{t-1}+b_{t-1}).$$
 
 The trend is parametrized as $$b_t = \beta (l_t-l_{t-1})+(1-\beta)b_{t-1}$$
 but the $\beta=0$ hence we have $b_t = b_{t-1}$ which also indicates that there is no trend in the data to actually find some meaningful conclusion.
@@ -104,6 +104,9 @@ dygraph(comb) %>% dyRangeSelector()
 
 However, the estimated smooth fit is not perfect at the trend is not suitable for the registered number of users. 
 In other words, from the business perspective we can find the seasonal component for registered users to be prepared but there is no trend to find from the data analysis of time series using Holt-Winter models. 
+
+We can also see the seasonality is captured but other fitted and estimation is incorrect on the model to be not precise enough. 
+This indicates the HW filtering is not suitable for perfect usage but to use for seasonal perspective on broad usage as well. 
 
 
 ``` {r,  echo=T}
