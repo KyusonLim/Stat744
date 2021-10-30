@@ -1,0 +1,157 @@
+---
+title: "Basics of Non-parametric Dirichlet Process"
+author: "Lim, Kyuson"
+date: "October 29th, 2020"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{subfig}
+  - \usepackage{amssymb}
+  - \usepackage{amscd}
+  - \usepackage{amsmath}
+  - \usepackage{amsthm}
+  - \DeclareRobustCommand{\bbone}{\text{\usefont{U}{bbold}{m}{n}1}}
+  - \DeclareMathOperator{\EX}{\mathbb{E}}% expected value
+  - \usepackage{bm}
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(knitr)
+library(sROC)
+library(pROC)
+library(ROCit)
+library(Epi)
+library(precrec)
+library(dirichletprocess)
+```
+## Basic Concept and NLP {.tabset}
+### Non-parametric methods {-}
+__By Bayesian statistics__: modelling with an infinite number of parameters.
+More accurately, modelling with a finite but variable number of parameters.
+
+__Parametric statistics__: some dimensions are fixed but unknown.
+The parametric model assumes for finite set of parameters.
+
+That is future predictions, $x$ is independent of observed data, $P(x\mid \theta, D) = P(x\mid \theta),$ thus allowing $\theta$ to capture everything there is to know about the data.
+
+__Non-parametric models__ assume that the data distribution caanot be defined in terms of such finite set of parameters. 
+
+__Bayesian non-parametric__: some dimensions keep on growing as getting more data.
+
+
+### Bayesian N-grams{-}
+`N-grams`: to model a sequence of words $p(w_1, w_2,..., w_N)$.
+
+`Unigram (1-gram) model`: $p(w_n\mid \vec \theta_1)$.
+
+`Bigram (2-gram) model`: $p(w_n\mid w_{n-1} \vec \theta_2)$
+
+`Trigram (3-gram) model`: $p(w_n\mid w_{n-1}, w_{n-2} \vec \theta_3)$
+
+Interpolate, which mean connect as a sentence: $\hat{p}(w_n\mid w_{n-1}, w_{n-2} \vec \theta_3) + \lambda p(w_n\mid w_{n-1}, \vec \theta_2)$
+
+_Ex._ Words in $[$he $[$ caught $[$a $[$ (words) $]]]]$ be very like words in $[$ caught $[$a $[$ (words)$]]]$. 
+Induce the probability of words by NLP(natural language processing) throught Bayesian statistics. 
+
+Related topics:
+`Hidden Markov Chain`
+`Naive Bayes Classifier`
+`Word 2 vec`
+`GloVe`
+`Gibbs sampling`
+
+ (I currently have all coding in __Python__)
+
+$S$= symbol set, fixed or possibly countably infinite.
+
+$\vec p_{\cdot} \sim$ prior on probability vectors (initial vocabulary)
+
+$\vec p_{\cdot\mid X_1} \sim$ distribution on probability vectors with mean $\vec P_{\cdot}$, for all $X_1\in S$
+
+$\vec p_{\cdot\mid X_1, X_2} \sim$ distribution on probability vectors with mean $\vec P_{\cdot\mid X_1}$, for all $X_1, X_2\in S$
+
+_Ex._ $\vec P_{\cdot}\Rightarrow \vec p_{\cdot\mid b}\Rightarrow \vec p_{\cdot\mid b,z} \Rightarrow \vec p_{\cdot\mid b,z,a}; \vec p_{\cdot\mid b,z,b}; \cdots \vec p_{\cdot\mid b,z,z}$
+
+## Dirichlet process {.tabset .tabset-fade .tabset-pills}
+### Definition and equation {.tabset .tabset-fade .tabset-pills}
+__Output of Dirichlet Process__: $\mu(A)=\sum_{k=1}^\infty p_k\delta_{\theta_{k}}(A)$.
+
+DP is a distribution over probability measures: $\color{red}{DP(\alpha, H(\cdot))}$
+
+$\color{red}{\alpha}$ is a concetration, which is like an inverse variance.
+
+$\color{red}{H(\cdot)}$ is the mean, base distribution.
+
+$\color{red}{m(\cdot)}$ is the measure, so $m(A) =\alpha H(A)$ and $\alpha = m(\chi) =1$ (probability measure on domain $\chi$, generating PDF and PMF)
+
+Note that the space $\chi$ is made to be _closed_ under the _finite union_ and _complement_, which is defined as Borel-$\sigma$-field.
+
+DP defined as the natural extension of a Dirichlet to arbitrary probability measures.
+_Ex._$G(\cdot)\sim$ DP(1, Gaussian(0,1)) (which is standard normal distribution)
+
+Approximation for $\vec p_0$: $\vec p_1\sim DP(500, \vec p_0) > \vec p_1\sim DP(5, \vec p_0) > \vec p_1\sim DP(0.5, \vec p_0)$.
+
+Now, $\color{red}{\theta_k\sim H(\cdot)}$ and $\color{red}{\mu(\chi) = \sum_{k=1}^\infty p_k =1}$
+
+Think of $\color{red}{\mu(\cdot)}$ as an infinite probability vector $\vec p$ indexed by points $\color{red}{\theta_k\in \chi}$. 
+The $\color{red}{\mu(\cdot)}$ are samples from DP and are not continuous distributions, even if input $H(\cdot)$ is.
+
+### Dirichlet process on Gaussian and Mixture {.tabset .tabset-fade .tabset-pills}
+```{r, out.width=".45 \\linewidth", fig.align="center", fig.cap="Gaussian"}
+include_graphics('a.png')
+```
+```{r, out.width=".45 \\linewidth", fig.align="center", fig.cap="Gaussian Mixture"}
+include_graphics('b.png')
+```
+
+## Basic properties {.tabset .tabset-fade .tabset-pills}
+### Infinite probability vector {.tabset .tabset-fade .tabset-pills}
+
+At most a smaller few of the $p_k$ can be larger and significant. 
+The number of $p_k > \delta$ must be less than $1/\delta$.
+There could be no more than 1000$p_k$ greater than 0.001.
+
+It is meaningless to consider $p_k$ without: defining some kind of ordering on indices, only considering those greater than some $\delta$, or ignoring the indices and only considering the partitions of data induced by the indices.
+
+With DP($\alpha, H(\cdot))$, the $\vec p$ probabilities, when rank ordered, behave like __geometric series__, $p_k\tilde{\propto} \frac{1}{e^{k/\alpha}}$
+
+### Stick Breaking  {.tabset .tabset-fade .tabset-pills}
+In the stick-breaking process view, we explicitly use the discreteness and give the probability mass function of this (random) discrete distribution.
+
+Simply, this is break piece, take remainder, break piece, take remainder, repeat, $1, 1-V_1, (1-V_1)(1-V_2)$.
+Repeatedly sample a proportion using a Beta distribution to break a piece off the remainder stick of length, $1-\sum^{k-1}_{j=1}p_j$.
+
+Due to the construction, remainder sticks vanish quickly so $p_k$ usually get vanishingly small as $k$ grows.
+This process takes with infinite probability vector $\vec p$ that is generated incrementally.
+$p_1=V_1$, where $V_1\sim$ Beta$(1-d, \alpha+d)$, $p_2=V_2 (1-p_1)$, where $V_2\sim$ Beta$(1-d, \alpha+2d)$, $p_3=V_3 (1-p_1-p_2)$, where $V_3\sim$ Beta$(1-d, \alpha+3d),...$ until $p_k=V_k (1-\sum_{j=1}^{k-1}p_j)$, where $V_k\sim$ Beta$(1-d, \alpha+kd)$.
+
+#### sampling points from DP
+`Chinese restaurant process`
+- By discreteness of $\mu(\cdot)$ samples must repeat, eg. $\theta_{394563}, \theta_{37}, \theta_{72345}, \theta_{37},...$
+
+Definition: a sample from a Chinese restaurant process (CRP) with parameters $(d,\alpha, H(\cdot))$ is generated (2 parameter version).
+
+1. First customer enters the restaurant, sits at the firt empty table and picks a dish according to $H(\cdot)$.
+
+2. Subsequent customer numbered $N+1$:
+
+(1) With probability $\frac{\alpha+Kd}{N+\alpha}$ ($K$ is the count of existing tables) sits at the empty table and picks a dish according to $H(\cdot)$.
+
+(2) Otherwise, joins an existing table $k$ with probability proportional to $\frac{n_k-d}{N+\alpha}$ ($n_k$ is the count of existing customers at the table) and has the dish served at that table.
+
+- Restaurant: single instance of a CRP, roughly like a Dirichlet-multinomial distribution.
+
+- Customer: one data point
+
+- Table: cluster of data points sharing the one sample from $H(\cdot)$.
+
+- Dish: the data value corresponding to a particular table; all customers at the table have this 'dish'.
+
+- Table count: number of customers at the table.
+
+- Seating plan: full configuration of table, dishes and customers.
+
