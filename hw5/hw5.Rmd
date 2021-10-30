@@ -1,0 +1,841 @@
+---
+title: "Recap of Exploratory visualization: Bike example, daily data"
+author: "Lim, Kyuson"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    highlight: tango
+    theme: yeti
+---
+
+# Motivation/Idea{-}
+
+The motivation is to predict the optimal values of consumers (count of causal users) for data based on the temperature. 
+
+I assume for some data given in the class without statement in the paper that the number of users are casually influenced by the temperature of daily records. 
+
+To investigate this issue, I would compare ARIMA, TFN (Transfer noise function model) and lastly fit neural network model to predict for the daily count of causal users from date of `2012-12-25` to `2012-12-31`.
+
+For the training dataset, the data of both temperature and causal variable is used from the date of `2011-02-01` to `2012-12-24`, as to account for the possible numbers of lagged time sequence in the TFN model for January data.
+
+In more detail, I would fit for the causal user variable against temperature because my asumption is that the lower the temperature is the less the number of causal users are to come for the bikes. 
+This causal relation could be modelled with TFN model.
+
+
+# Set up {-}
+
+Such time series modelling is based on the use of unit root test imported from reference list for stationarity of ARIMA/ARMA model to use with.
+
+Also, the Ljung-Box test code is provided from University of Toronto STA457 class directly from the lecture note for testing the stationary of ARMA model by the p-value. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate); library(xts); library(timeSeries)
+library(forecast); library(ggplot2); library(knitr)
+library(readxl); library(MASS); library(forecast); library(lmtest)
+library(timeDate); library(sarima); library(DT); library(ggpubr)
+library(gridExtra); library(dynlm); library(dygraphs)
+library(ggplot2); library(tidyverse); library(plotly)
+library(dplyr); library(tidyquant);library(ggplotFL); library(ggpmisc)
+
+
+
+
+# Compute AR roots
+arroots <- function(object)
+{
+  if(!("Arima" %in% class(object)) &
+     !("ar" %in% class(object)))
+    stop("object must be of class Arima or ar")
+  if("Arima" %in% class(object))
+    parvec <- object$model$phi
+  else
+    parvec <- object$ar
+  if(length(parvec) > 0)
+  {
+    last.nonzero <- max(which(abs(parvec) > 1e-08))
+    if (last.nonzero > 0)
+      return(structure(list(
+          roots=polyroot(c(1,-parvec[1:last.nonzero])),
+          type="AR"),
+        class='armaroots'))
+  }
+  return(structure(list(roots=numeric(0), type="AR"),
+    class='armaroots'))
+}
+
+# Compute MA roots
+maroots <- function(object)
+{
+  if(!("Arima" %in% class(object)))
+    stop("object must be of class Arima")
+  parvec <- object$model$theta
+  if(length(parvec) > 0)
+  {
+    last.nonzero <- max(which(abs(parvec) > 1e-08))
+    if (last.nonzero > 0)
+      return(structure(list(
+          roots=polyroot(c(1,parvec[1:last.nonzero])),
+          type="MA"),
+        class='armaroots'))
+  }
+  return(structure(list(roots=numeric(0), type="MA"),
+    class='armaroots'))
+}
+
+plot.armaroots <- function(x, xlab="Real", ylab="Imaginary",
+    main=paste("Inverse roots of", x$type,
+          "characteristic polynomial"),
+    ...)
+{
+  oldpar <- par(pty='s')
+  on.exit(par(oldpar))
+  plot(c(-1,1), c(-1,1), xlab=xlab, ylab=ylab,
+       type="n", bty="n", xaxt="n", yaxt="n", main=main, ...)
+  axis(1, at=c(-1,0,1), line=0.5, tck=-0.025)
+  axis(2, at=c(-1,0,1), label=c("-i","0","i"),
+    line=0.5, tck=-0.025)
+  circx <- seq(-1,1,l=501)
+  circy <- sqrt(1-circx^2)
+  lines(c(circx,circx), c(circy,-circy), col='gray')
+  lines(c(-2,2), c(0,0), col='gray')
+  lines(c(0,0), c(-2,2), col='gray')
+  if(length(x$roots) > 0)
+  {
+    inside <- abs(x$roots) > 1
+    points(1/x$roots[inside], pch=19, col='black')
+    if(sum(!inside) > 0)
+      points(1/x$roots[!inside], pch=19, col='red')
+  }
+}
+
+
+# prewhitening - transfer functon model source code/Time series lecture provided 
+PreWhiten.arma<- function(x , ar = NULL, ma = 0){
+        if(is.null(ar) && is.null(ma)) print("both ar and ma coefficients are empty!")
+        pwData = numeric(0)
+        m = as(modelCoef(new("ArmaModel", ar = ar, ma = ma)), "list")
+        eps = numeric(length(x))
+        pwData = xarmaFilter(m, x =x, eps = eps, whiten = TRUE) 
+        pwData[!is.na(pwData)]
+}
+PreWhiten.ar<- function(x , ar = NULL){
+        if(is.null(ar)) print(" autoregressive coefficients are empty!")
+        pwData = numeric(0)
+        pwData = filter(x, c(1, -ar),method=c("convo"),sides=1) 
+        pwData[!is.na(pwData)]
+}
+
+LBTest<- function(res, nPQ = 0, m = 36, ifPlot = FALSE){
+        stopifnot(nPQ >= 0, m >= 1, m > nPQ)
+        n <- length(res)
+        lags <- 1:m
+        df <- (nPQ+1):m 
+        ra <- (acf(res, lag.max = m, plot = FALSE)$acf)[-1]
+        QQ <- n * (n + 2) * cumsum((ra^2)/(n - (1:m)))[df]
+        
+        pv <- 1 - pchisq(QQ, df)
+        QQ <- round(QQ, 2)
+        a <- matrix(c(df, QQ, pv), ncol = 3)
+        dimnames(a) <- list(rep("", length(QQ)), c("m", "Qm", "pvalue"))
+        if(ifPlot){
+                k<-as.data.frame(cbind(a[,1], a[,3]))
+                colnames(k)<-c('m', 'pvalue')
+                LB_test<-ggplot(k, aes(x=m, y= pvalue))+
+                  geom_point(color=c('skyblue'), shape=15)+
+                  theme_tq()+
+                  geom_hline(col=2, yintercept = 0.05, linetype="dotted", size=0.5)+
+                geom_hline(col=2, yintercept = 0.01, linetype="dotted", size=0.5)
+                ggplotly(LB_test)
+        }else {
+                a
+        }
+}
+```
+
+
+\ \ \ \ \   
+
+## Fitting the data {-} 
+
+
+```{r, message=F, echo=T}
+setwd("/Users/kyusoinlims/Desktop/STATS 744")
+#d at<-ts(read.csv(file.choose()))
+dat<-ts(read.csv('day.csv'))
+
+
+# count of customers
+Timeline<-seq(as.Date("2011-01-01"), as.Date("2012-12-31"), by='days')
+del.dat =xts(dat[,14], frequency = 7,Timeline)
+
+# temperature
+temp.dat=xts(dat[,10], frequency = 7,Timeline)
+```
+
+
+## Nobel prize in economics: Granger test{-}
+
+From the famous example of egg and chicken data, which one to cause the other, the Granger test could be used for the time series data to verify if there truely exists for the causal relationship between two data we are trying to test with. 
+
+```{r, message=F}
+# Granger test
+cons_us<-diff(dat[,14])
+temper_no<-diff(dat[,10])
+
+# does temperature cause casual consumer?
+grangertest(cons_us~temper_no)
+
+# or the other way?
+grangertest(temper_no~cons_us)
+```
+
+As to verify from the first test for the difference of data in two datasets, we can find that the first test to be significant and conclude that the normalized temperature data actually comes first for the causal influence on the number of casual users in daily data.
+
+This validate for us to proceed for the TFN model where the casual relationship could be eliminated by the prewhitening process to model the number of causal users against the other dataset, normalized temperature.
+
+\ \ \ \ \   
+
+# Use the data to study the overall trend of two datasets{-}    
+
+```{r, message=F, echo=T}
+#split training and forecasting sample
+temp.obs = window(temp.dat, start = "2011-02-01", end = "2012-12-24")
+temp.test = window(temp.dat, start = "2012-12-25", end = "2012-12-31")
+
+tm.obs = window(del.dat, start =  "2011-02-01", end = "2012-12-24")
+tm.test = window(del.dat, start = "2012-12-25", end = "2012-12-31")
+
+
+# temperature
+# trend smoothed line
+df<-data.frame(Temperature = dat[,10], Timeline)
+colnames(df)<-c('Temperature')
+plot_1<-ggplot(df, aes(Timeline, Temperature)) + geom_line(na.rm=TRUE)+ stat_smooth()+ theme_tq()+ xlab('timeline')+ ylab('Normalized temperature')+scale_x_date(date_labels = "%Y %b %d")
+
+
+
+# interactive plot
+ggplotly(plot_1)
+
+# plot peaks
+plot_2<-plot_1+stat_peaks(colour = "grey")
+ggplotly(plot_2)
+
+
+# plot valleys
+plot_3<-plot_1+stat_valleys(colour = "lightblue")
+ggplotly(plot_3)
+```
+
+For capturing the trend of the data, we fit smoothing conditional means for stat_smooth to figure out if this option visually captures some trend of the data. 
+
+By plotting two different options, local minima and local maxima of the time series data, we want to know if this trend curve of smoothing conditional means is somewhat captured by the points of local minima and maxima.
+
+However, we may find from this visually smoothed curve that there is a trend for seasonality in the normalized temperature where the drastic decrease happens in Winter as to know with. 
+
+
+```{r, message=F, echo=T}
+# casual, count of users
+df<-data.frame(Casual = dat[,14], Timeline)
+colnames(df)<-c('Casual')
+
+plot_4<-ggplot(df, aes(Timeline, Casual)) + geom_point(na.rm=TRUE, color='grey', size=0.7, alpha=0.4)+ geom_smooth(span = 0.4)+ theme_tq()+ xlab('timeline')+ ylab('Causal users')+scale_x_date(date_labels = "%Y %b %d")+stat_smooth(color=c('red'))
+
+# by geom_smooth loess on time series data, compare for difference smoothe estimator
+ggplotly(plot_4)
+```
+
+For the consumer data where there is more variability, we may also fit two different curves, to capture is there is any curve that could possibly capture the variability to account for the points. 
+
+However, we may find from this visually smoothed curve of smoothed conditional means captures the trend and more variability than the other for the seasonality in the number of causal consumers where the drastic decrease happens in the Winter also to verify with.
+
+Moreover, it passes through more points than the other as well as find some adequate median number of causal users in the data to match with the time trained data. 
+
+
+```{r, message=F, echo=T}
+# linear prediction estimation method
+ti = 1:length(df$Casual)
+m3 = lm(df$Casual~ti+I(ti^2)+I(ti^3)+I(ti^4)+I(ti^4)+I(ti^5))
+
+
+# estimated values
+data.fmt=data.frame(color = c("#CCCCCCCC"), width=4)
+line.fmt=data.frame(dash = c("solid"), width=1.5, color=c('orange'))
+p.glob = plot_ly(y=df$Casual, x=Timeline, type="scatter", mode="lines", line=data.fmt, name="Data")
+p.glob = add_lines(p.glob, x=Timeline, y=predict(m3), line=line.fmt, name="Linear")
+p.glob %>% layout(
+  xaxis = list())
+```
+
+This special curve of linear model captures the trend and variability well for the time series data. 
+One of the simplest methods to identify trends is to fit a ordinary least squares regression model to the data. 
+
+
+The model most people are familiar with is the linear model, but we can add other polynomial terms for extra flexibility. 
+In practice, we avoid polynomials of degrees larger than three because they are less stable but the 5 degrees of polynomial model well capture the trend and variability of the model excluding both tails of the polynomial model which goes below 0.
+
+
+## ARMA model for Casual users {-}
+
+
+```{r, message=F}
+#prewhiten x
+# RGDP residual change rate model
+mod.arma <- auto.arima(tm.obs, max.p = 52, stationary = T, seasonal=F, ic = c( "bic")) 
+kable(coef(mod.arma))
+
+# residuals white noise check
+ggplotly(ggqqplot(mod.arma$residuals, color = c("#0073C2FF"),
+   ggtheme = theme_pubclean()))
+
+# compare arima model and original data
+Timeline<-seq(as.Date("2011-02-01"), as.Date("2012-12-24"), by='days')
+comb <- cbind(as.vector(tm.obs), as.vector(mod.arma$fitted))
+colnames(comb)<-c('Actual', 'Fitted value')
+comb<-data.frame(Timeline, comb)
+```
+
+We may find the ARMA model for the causal user is not perfectly fitted well by the comparing the actual values and its fitted values. 
+
+The model has some deviation for its residuals to deviate as a white noise for its residuals but it also broadly fits for the model of AR(3) from its significant lag by the code of auto.arima which searched for the optimal model by BIC criteria.
+
+However, some minor steps for identification of PACF and ACF plots are skipped as the main goal is the build the TFN model using normalized temperature.
+
+
+```{r, message=F}
+comb = xts(x=comb[,-1], order.by=comb$Timeline)
+dygraph(comb) %>% dyRangeSelector()
+ 
+# forecast
+pre<-forecast(mod.arma, h = 7, findfrequency = TRUE)
+pre_1<-cbind(pre$mean, pre$upper[,1], pre$lower[,1])
+colnames(pre_1)<-c('fitted', 'upper', 'lower')
+pre_1 = ts(pre_1, start = as.Date("2012-12-25"), end = as.Date("2012-12-31"))
+
+
+# forecast graph
+dygraph(pre_1, main = "Predicted week (7 days) Number of Customers") %>%
+  dyAxis("x", drawGrid = FALSE) %>%
+  dySeries(c("lower", "fitted", "upper"), label = "Temperature")%>% dyRangeSelector()
+
+```
+
+We can find easily the AR(3) model deviates from the actual points in the Winter season heavily while other seasons are easily fitted against the actual values. 
+
+Also, the predicted values with 90% confidence interval could be visualized for practical prediction usage as for reference purpose. 
+
+
+# ARMA model of normalized temperature data and fitting plan for TFN model{-}
+
+To Conduct `prewhitening` analysis to identify the lead-lag relationship between number of casual users and noramlized temperature;      
+
+   * ARMA model for normalized temperature and its residual ACF and PACF plots
+   * We use cross correlation plot of prewhitened processes to identify transfer function ($\nu_i$)
+
+This would lead to give the accommodated model of transfer function noise model for casual users variable eliminating the correlation that exists between two variables of data. 
+
+Note that the casual relationship is verified for us to test only for the cross-correlation plot for the daily number of causal users to model against the normalized temperature with significant lag found from the CCR plot. 
+
+
+```{r, message=F}
+# prewhiten x
+# RGDP residual change rate model
+mod.arma1 <- auto.arima(temp.obs, max.p = 52, stationary = T, seasonal=F) 
+kable(coef(mod.arma1))
+
+## unit root test
+par(mfrow=c(1,2))
+plot(arroots(mod.arma1), main="Inverse AR roots")
+
+
+# compare arima model and original data
+compa <- cbind(as.vector(temp.obs), as.vector(mod.arma1$fitted))
+colnames(compa)<-c('Actual', 'Fitted value')
+Timeline<-seq(as.Date("2011-02-01"), as.Date("2012-12-24"), by='days')
+compa<-data.frame(Timeline, compa)
+compa = xts(x=compa[,-1], order.by=compa$Timeline)
+dygraph(compa) %>% dyRangeSelector()
+ 
+# forecast
+pre<-forecast(mod.arma1, h = 7, findfrequency = TRUE)
+pre_1<-cbind(pre$mean, pre$upper[,1], pre$lower[,1])
+colnames(pre_1)<-c('fitted', 'upper', 'lower')
+pre_1 = ts(pre_1, start = as.Date("2012-12-25"), end = as.Date("2012-12-31"))
+
+
+
+# forecast
+dygraph(pre_1, main = "Predicted week (7 days) Normalized temperature") %>%
+  dyAxis("x", drawGrid = FALSE) %>%
+  dySeries(c("lower", "fitted", "upper"), label = "Temperature")%>% dyRangeSelector()
+
+```
+
+Unlike the time series model of number of causal users, the AR(6) model for the normalized temperature perfectly fits.
+
+
+This indicates us to easily go on to the next step of verification for the significant lag in TFN model which could be used for the predicting the last 7 days of 2012 in number of causal users. 
+
+
+# Model this relationship using the transfer function noise model {-}
+
+
+```{r, message=F}
+#prewhiten x
+
+# residual check
+res<-mod.arma1$residuals
+pr = res%>%ggAcf()+theme_minimal()
+prs = res%>%ggPacf()+theme_minimal()
+grid.arrange(pr,prs, nrow=1)
+
+# Ljung-Box portmanteau test
+p = mod.arma1$arma[1]; q = mod.arma1$arma[2]
+temp<-LBTest(mod.arma1$residuals, nPQ = p+q, m = 24, ifPlot = TRUE)
+
+
+#prewhiten y
+mod = mod.arma1;nAR = mod$arma[1]; nMA = mod$arma[2]
+if(nMA!=0){
+  xf = PreWhiten.arma(temp.obs, ar = mod$coef[1:nAR], 
+                      ma = mod$coef[(1:nMA)+nAR])[-(1:nAR)]
+  yf = PreWhiten.arma(tm.obs, ar = mod$coef[1:nAR], 
+                      ma=mod$coef[(1:nMA)+nAR])[-(1:nAR)]  
+}else{
+  xf = PreWhiten.arma(temp.obs, ar = mod$coef[1:nAR], 
+                      ma = 0)[-(1:nAR)]
+  yf = PreWhiten.arma(tm.obs, ar = mod$coef[1:nAR], 
+                      ma=0)[-(1:nAR)] 
+}
+
+
+#ccf plot prewhiten x and y
+par(cex=0.75, bg='gray98')
+ccf(c(xf), c(yf), lwd=4, ylab="Cross-correlation functions",lag.max=30,
+    main="CCF")
+abline(v=0, col="gold", lwd=3, lty="dashed")
+text(-1, 0.2, '-1', col=2);text(-2, 0.2, '-2', col=2)
+```
+
+
+The residuals is observed to be white noise for stationary process with PACF and ACF plot except for the significant lag at 6 as to be AR(6) model without any patterns and also have root inside the unit circle. 
+Also, the residual of the model passes the Ljung-Box portmanteau test where all values are greater than 0.05.
+
+Observing from the Cross-Correlation plot of prewhitened number of causal users and the normalized temperature, the prewhitened number of causal user is constructed by lagged regression (relationship) of the normalized temperature as stated in Granger causality test to be predicted for significant negative lags from -1 to 0 for its _most significant lag_ (higher than the other and significantly large) which is used.
+
+Note that the plot of lags reflect the actual significant and we seek for the most significant lag along with its following lags in the negative sides, not positive side (which means the temperature is the result of causality), to choose for the sequence significant lags. 
+
+
+# Fit a multiple regression using the findings in the `prewhitening` step, i.e.
+
+$$y_t = \sum_i v_i x_{t-i} +\xi_t,~~~(1)$$
+where $y_t$ and $x_t$ denote the output and input process, respectively, and $\xi_t$ is the noise process.
+We had used `prewhitening` to select the lagged $\{x_i\}$ in the regression
+
+```{r, message=F}
+#fit Equation (1)
+CU2 = ts(dat[,14], frequency = 7, start = as.Date("2012-02-01"), end = as.Date("2012-12-31"))
+TEM = ts(dat[,10], frequency = 7, start = as.Date("2012-02-01"), end = as.Date("2012-12-31"))
+mod.dynlm = dynlm(CU2~L(TEM, 0:1))
+kable(t(coef(mod.dynlm)))
+
+#plot residual ACF and PACF of the above regression
+res1<-ts(mod.dynlm$residuals, frequency = 7, end = c(2012,12,31))
+pr1 = res1%>%ggAcf()+theme_minimal()
+prs1 = res1%>%ggPacf()+theme_minimal()
+grid.arrange(pr1,prs1, nrow=1)
+
+
+# Ljung-Box portmanteau test
+LBTest(mod.dynlm$residuals, nPQ = 12, m = 40, ifPlot = TRUE)
+
+# Alternative QQplot
+ggplotly(ggqqplot(mod.dynlm$residuals, color = c("orange"),
+                  ggtheme = theme_pubclean()))
+
+# Alternative: Shipiro-Wilk test
+shapiro.test(mod.dynlm$residuals)
+
+# failed model:  compare arima model and original data
+combi <- cbind(tm.obs, mod.dynlm$fitted.values[1:length(tm.obs)])
+colnames(combi)<-c('Actual', 'Fitted value')
+dygraph(combi) %>% dyRangeSelector()
+```
+
+Based on the ACF plot, let choose the $p=6$ and the pacf plot gives $q=6$ such that the sum of $npq=12$ with max lag to test in LBjung's test for stationarity.
+
+However, from ACF and PACF plot we can find the model is __not__ adequate for multiple regression, as dynamic regression model.
+
+But this is part of the step to reason why we construct the model of TFN, not multiple regression.
+
+The multiple regression has used the number of causal users as response $y$-values with time train of 2011-02-01 up to 2012-12-31 and the normalized temperature as $x$-variables, with 0 to -1 significant lags observed from the CCF found.
+
+The model is the number of causal users at time $t$, and $TM_t$ stands for the normalized temperature at time $t$, $n_{1,t}$ stands for the noise process for $D_t$.
+
+However, the multiple regression model is __non-stationary__ with serially correlated residuals from PACF and ACF plot with Ljung Box test to be __not__ passed (we need to go over the line of threshold).
+
+Ljung Box portmandeu test is not accurate all times but we can also test if it is white noise by the QQplot where there are still much deviation to notice with. 
+
+Moreover, the Shapiro-Wilk test for normality shows to reject null hypothesis and conclude that the model is not stationary with small p-value. 
+
+Hence, the model could __not__ be used. 
+
+
+Fit a transfer function noise model using the rational distributed lag function {-}
+i.e. $$y_t = \frac{\delta(B)}{\omega(B)}x_t+n_t$$
+where $\delta(B)$ and $\omega(B)$ are polynomials in the _backward shift operator_ $B$, and $n_t$ follows an ARMA process. 
+
+We would go through steps to identify the mathematical representation of the fitted model.
+
+```{r, message=F}
+#fit Equation and show the fitted model
+
+temp.obs = window(temp.dat, start = "2011-02-01", end = "2012-12-31", by='days')
+tm.obs = window(del.dat, start = "2011-02-01", end = "2012-12-31", by='days')
+
+x <- temp.obs
+y <- tm.obs
+
+datt<- cbind(y, x, stats::lag(x, 1))[-c(1),]
+colnames(datt)<-c("Cas","Tem","Tem1")
+
+tim0 <-timeSequence(from = "2011-02-02", to = "2012-12-31", by = "day")
+data<- timeSeries(datt, charvec = tim0)
+
+## divide into forecast and training dataset
+data.obs = window(data, start = "2011-02-02", end = "2012-12-24") 
+data.test = window(data, start = "2012-12-25", end = "2012-12-31")
+
+# fit TFN model
+mod.tfn = auto.arima(data.obs[,1], xreg = data.obs[,-1], seasonal=F, stationary=T)
+
+
+# coeff
+kable(t(round(coef(mod.tfn),2)))
+```
+
+
+
+For ARMA(2,1) model, it is expressed as,
+$$y_t = -137.909 +0.793y_{t-1}-0.401 y_{t-2} +2253.103 x_t -247.808 x_{t-1} +a_t -0.173 a_{t-1}$$, where $$a_t\sim NID(0, 240083)$$ for white noise.
+
+Using compact notation (AR, MA part),
+$$(1 +0.793 B- 0.401 B^2)y_t
+ = -137.909 +(+2253.103-247.808 B)x_t +(1 -0.173 B) a_{t}$$.
+
+Equivalently, 
+$$y_t = -99.07+ \frac{(2253.103-247.808 B)}{(1 +0.793 B- 0.401 B^2)} x_t+\frac{(1 -0.173 B)}{(1 +0.793 B- 0.401 B^2)} a_t$$, where $$a_t\sim N(0, 240083)$$ for white noise and $$\frac{-137.909}{(1 +0.793 -0.401)} \approx -99.07$$.
+
+
+
+
+```{r, message=F}
+## plot
+con<- window(del.dat, start = "2011-02-02", end = "2012-12-24", by='days')
+combin<-cbind(mod.tfn$fitted, con)
+colnames(combin)<-c('fitted','actual')
+
+
+
+# plot
+Timeline<-seq(as.Date("2011-02-02"), as.Date("2012-12-24"), by='days')
+don <- data.frame(Timeline,combin)
+don=xts( x=don[,-1], order.by=don$Timeline)
+dygraph(don) %>% dyRangeSelector()
+```
+
+
+However, the model fit it __not__ perfect and some part April 23rd 2012 to be below 0 for inadequate point as well. Compare to multiple regression the overall fits and model diagnostic is good to use as a model. 
+For clear comparison, we would use the ARIMA model to compare for the MSE, MAPE, MAE for 7 days left for week for December 25th to 31st. 
+
+
+## The model adequacy tests (diagnostics) on the above models {-}   
+
+```{r, echo=FALSE, message=F, fig.height=3}
+#check model adequacy of residual serial correlation
+
+res2<-ts(mod.tfn$residuals,frequency = 7, end = c(2012,12,24))
+pr2 = res2%>%ggAcf()+theme_minimal()
+prs2 = res2%>%ggPacf()+theme_minimal()
+grid.arrange(pr2,prs2,  nrow=1)
+
+
+#check model adequacy of residual crosss correlation 
+m = 40        ## Kyuson
+lags = 1:m   ## max lag set, over 40, there's chi-square asymtotic property 
+df <- (3+1+2):m   ## lags of TFN model
+n = length(mod.tfn$res)
+rccf = ccf(mod.arma1$residuals, mod.tfn$residuals, plot = FALSE, lag.max = m)$acf[-(1:m)]
+Qm = n* (n + 2) * cumsum((rccf^2)/(n - (0:m)))[df]
+pv <- 1 - pchisq(Qm, df)
+a = cbind(df, Qm, pv)
+
+LBTest(mod.tfn$res, nPQ = 4+3, m=40, ifPlot = TRUE) 
+
+## alternative
+shapiro.test(mod.tfn$residuals)
+```
+
+The Ljung-Box test is higher than 0.05 p-value for residuals to __not__ pass the test.
+The blue line of limits are based on the approximate large sample standard error that applies to a white noise process. 
+The sample ACF values exceed these rough critical values is not counted, as the true autocorrelations are both zero.
+
+The plot demostrates asymptotically increasing over $m$ for moderately large enough values for greater p-values which should indicate to be significant after $m=32$ as to pass the Cross-corrleation plot (by central limit theorem applied). 
+
+However, the model diagnostic of TFN model is not passed to fail for further inference. 
+At the end, neural network model could be fitted for most accurate prediction.
+
+```{r, message=F}
+#forecast using tfn
+
+pre.tfn<-forecast(mod.tfn, xreg = data.test[,-1])
+kable(pre.tfn)
+
+#calculate MSE, MAE, MAPE 
+
+yobs<-as.data.frame(data.test)[,1]
+yhat<-forecast(mod.tfn, xreg=data.test[,-1], data.test[,1])$mean
+
+RMSE_TFN<-mean((yobs-yhat)^2)%>% sqrt()
+MAE_TFN<-mean(abs(yobs-yhat))
+MAPE_TFN<-mean(abs(1-yhat/yobs))
+kable(cbind(RMSE_TFN, MAE_TFN, MAPE_TFN))
+```
+
+
+\ \ \ \ 
+
+# Sample forecasts of the above fitted models using the remaining observations.
+
+
+The forecast performance using Mean squared error (MSE), Mean absolute error (MAE), and Mean absolute percentage error (MAPE) is as follows: 
+$RMSE = \sqrt \frac{\sum_{i=1}^L (y_{t+i}-\hat y_t(i))^2}{L}$,
+\newline
+$MAE = \frac{\sum_{i=1}^L \left|y_{t+i}-\hat y_t(i)\right|}{L}$,
+\newline
+$MAPE = \frac{1}{L}\sum_{i=1}^L \left|1-\frac{\hat y_t(i)}{y_{t+i}}\right|,$
+\newline
+where $\hat y_t(i)$ denotes the forecast at origin $t$ with lead time $i$.
+
+
+(The MAE is lower the better for the forecast is. 
+The models which try to minimize MAE lead to forecast median.
+The models trying to minimize RMSE lead to a forecast of the mean.
+Both MAE and RMSE are scale-dependent errors. 
+This means that both errors and data are on the same scale.)
+
+
+\ \ \ \  
+
+## The same out of sample forecasts soley on $y_t$ using an ARIMA model {-} 
+
+
+We are to compare and discuss its peformance metrics with the TFN model. 
+We may fit an ARIMA model on $y_t$ using `auto.arima` but ensure that the fitted model pass the Ljung-Box test.
+
+
+```{r, message=F}
+#forecast using auto.arima
+
+# PACF, ACF of auto.arima
+m<-auto.arima(tm.obs)
+pr3 = m$residuals%>%ggAcf()+theme_minimal()
+prs3 = m$residuals%>%ggPacf()+theme_minimal()
+grid.arrange(pr3,prs3, nrow=1)
+
+
+# ARIMA
+tm.obs = window(del.dat, start = "2011-02-01", end = "2012-12-24")
+tm.test = window(del.dat, start = "2012-12-25", end = "2012-12-31")
+mod.arima = arima(tm.obs, c(5,0,3))
+kable(t(round(coef(mod.arima),2)))
+
+
+# PACF, ACF, no significant lags
+m<-mod.arima$residuals
+pr3 = m%>%ggAcf()+theme_minimal()
+prs3 = m%>%ggPacf()+theme_minimal()
+grid.arrange(pr3,prs3, nrow=1)
+
+
+par(mfrow = c(1,1))
+## Ljung test
+p = mod.arima$arma[1]; q = mod.arima$arma[2]
+LBTest(mod.arima$residuals, nPQ = p+q, m = 40, ifPlot = TRUE)
+
+# combine for data formation
+combina <- cbind(as.vector(tm.obs), fitted(mod.arima))
+colnames(combina)<-c('Actual','Fitted')
+
+# plot
+Timeline<-seq(as.Date("2011-02-01"), as.Date("2012-12-24"), by='days')
+contr_pl <- data.frame(Timeline, combina)
+contr_pl = xts( x=contr_pl[,-1], order.by=contr_pl$Timeline)
+dygraph(contr_pl) %>% dyRangeSelector()
+
+
+
+# forecast 7 points
+pre.arima<-forecast(mod.arima, h=7)
+kable(pre.arima)
+
+#calculate MSE, MAE, MAPE 
+
+yobs<-as.data.frame(data.test)[,1]
+yhat<-forecast(mod.arima, h=7)$mean
+
+RMSE_ARMA<-mean((yobs-yhat)^2)%>% sqrt()
+MAE_ARMA<-mean(abs(yobs-yhat))
+MAPE_ARMA<-mean(abs(1-yhat/yobs))
+kable(cbind(RMSE_ARMA, MAE_ARMA, MAPE_ARMA))
+
+# compare
+ARMA<-rbind(RMSE_ARMA, MAE_ARMA, MAPE_ARMA)
+TFN<-rbind(RMSE_TFN, MAE_TFN, MAPE_TFN)
+comp<-cbind(ARMA, TFN); rownames(comp)<-c('RMSE', 'MAE', 'MAPE') 
+colnames(comp)<-c('ARMA','TFN')
+kable(comp)
+```
+
+The auto.arima model found with ARMA(5,3) is __not__ adequate as the residual of PACF and ACF plot shows serially correlated lags above significant level. 
+The model is found with ACF and PACF plot for significant lags and also the manual model had white noise to be not much suited for the residuals.
+
+First, the ARMA model for deliquency rate is ARMA(5,3) where residuals do _not_ show any pattern and pass Ljung-Box portmanteau test for over p-value of 0.05.
+The roots are all contained in the unit circle to be stationary process.
+
+The RMSE and MAPE is higher for ARMA model than the TFN model indicating the fitted model is better in prediction for 7 points from `2012-12-25` to `2012-12-31`.
+
+The MAE value is lower compared to TFN model by approximately 1, indicating the better for the forecast is.
+ 
+ 
+ \ \ \ \ \ 
+ 
+ 
+##### (Simple Ensemble model construction) {-}
+
+
+Although both models of ARMA and TFN is failed, we may construct the combinated model of these two for equal weight 0.5, to forecast and find if there improvement for the forecast.
+
+We are to conduct the same out of sample forecast analysis using forecast combination of the fitted TFN model and ARIMA model (equal weight and MSE weighting). 
+
+* _Forecast combination:_      
+The combined forecaster $\hat f_t(i)$ may be given by
+$$\hat f_t(i) = w_a ~ \hat y_t^{(a)}(i)+w_b~ \hat y_t^{(b)}(i),$$
+where the superscripts $(a)$ and $(b)$ stand for transfer function noise model and ARIMA model, respectively. For the equal weight scheme, $w_a = w_b = 0.5$, and for the MSE weighting scheme, we may find for the MSE comparison if there is any enhancement in the model.
+
+```{r, message=F}
+#calculate MSE, MAE, MAPE for the equal weight forecast
+yobs<-data.test[,1]
+yhat<-forecast(mod.tfn, xreg=data.test[,-1], data.test[,1])$mean
+yhat1<-forecast(mod.arima, h=7)$mean
+
+y_w<-as.vector(0.5*yhat)+as.vector(0.5*yhat1)
+
+# MSE
+RMSE_w<-mean((yobs-y_w)^2)%>%sqrt()
+
+# MAE
+MAE_w<-mean(abs(yobs-y_w))
+
+# MAPE
+MAPE_w<-mean(abs(1-y_w/yobs))
+
+kable(cbind(RMSE_w, MAE_w, MAPE_w))
+
+# compare
+ARMA<-rbind(RMSE_ARMA, MAE_ARMA, MAPE_ARMA)
+TFN<-rbind(RMSE_TFN, MAE_TFN, MAPE_TFN)
+same<-rbind(RMSE_w, MAE_w, MAPE_w)
+comp0<-cbind(ARMA, TFN, same); colnames(comp0)<-c('ARMA','TFN', 'Same weight')
+rownames(comp0)<-c('RMSE', 'MAE', 'MAPE')
+kable(comp0)
+```
+
+The 0.5 equal weight the models give RMSE and MAPE lower than ARMA model prediction but higher than TFN model prediction.
+However, the MAE is lowered than both models indicating the significance of constructing a ensemble model for time series. 
+
+The equal weight of 0.5 for both ARMA and TFN model RMSE, MAE and MAPE is relatively lower by around 14, 6, and 1 but higher than the TFN model RMSE, MAPE and MAE values by around 1, -7 and 1 equivalently. 
+
+Clearly, the combined model weighted is __not__ low enough to make prediction to be better than the TFN model for 7 forecasting points. 
+
+
+
+\ \ \ \ \ \
+
+## Conclusion {-}
+
+We are necessary to construct the __stationary__ model that could fit on robustly for our data. 
+The model diagnostic indicated some failures in construction of the model and it should be resolved for both models. 
+Also, with more forecast points and optimal combination for the ensemble model of TFN and ARMA model, we look forward to fit for better performance model. 
+This would require some more construction on the weight given for both models.
+However, lastly we can compare for the model performance of the neural network model to find if this would give for the optimal performance. 
+
+Moreover, considering the seasonality of the year and casual users, we may also use SARIMA models to construct the forecast of different seasonal points. 
+
+
+
+# Expansion for simple deep learning models
+
+```{r, message=F}
+# Neural network model
+mod.nn = forecast::nnetar(tm.obs);mod.nn
+
+# check that roots are within the unit circle
+combinat <- cbind(as.vector(tm.obs), as.vector(mod.nn$fitted))
+colnames(combinat)<-c('Actual','Fitted')
+
+# plot
+Timeline<-seq(as.Date("2011-02-01"), as.Date("2012-12-24"), by='days')
+best_n <- data.frame(Timeline, combinat)
+best_n = xts(x=best_n[,-1], order.by=best_n$Timeline)
+dygraph(contr_pl) %>% dyRangeSelector()
+```
+
+
+
+As we can notice the model is almost perfect to be much better than the other models we have seen from above. 
+The outcome and performance of the model is extensively better.
+
+
+## Prediction intervals for NNETAR models{-}
+
+```{r, message=F}
+# forecast 7 points
+fit.nn0 = accuracy(forecast(mod.nn, h=7), tm.test)
+kable(fit.nn0)
+
+# prediction plot
+fcast <- forecast(mod.nn, PI=TRUE, h=7)
+ft<-as.data.frame(fcast)[,1]
+best_npt<-cbind(as.vector(tm.test), as.vector(ft))
+colnames(best_npt)<-c('Actual','Fitted')
+
+
+
+# plot
+Timeline<-seq(as.Date("2012-12-25"), as.Date("2012-12-31"), by='days')
+best_npt <- data.frame(Timeline, best_npt)
+best_npt = xts(x=best_npt[,-1], order.by=best_npt$Timeline)
+dygraph(best_npt) %>% dyRangeSelector()
+```
+
+The model can be written as
+$$y_t = f(\boldsymbol{y}_{t-1})+\epsilon_t,\; \epsilon_t\sim N(0,1)$$
+where $\boldsymbol{y}_{t-1}$ is a vector containing lagged values of the series, and f is a neural network with hidden nodes in a single layer.
+
+However, for small prediction points, 7 days, the neural network model has some discrepancy to be large enough. 
+In this cases, we could also come up with simulations on different model to construct for better forecast on the last week of 2012.
+
+
+
+
+* __Reference:__ https://www.displayr.com/how-to-add-trend-lines-in-r-using-plotly/ (estimation for visual inspection)
+* __Reference:__ https://rstudio.github.io/dygraphs/ (Dynamic Graph)
+* __Reference:__ https://robjhyndman.com/hyndsight/arma-roots/ (Unit Root test)
+* __Reference:__ William W.S. Wei (2006), _Time Series Analysis--Univariate and Multivariate Methods_, Second Edition. (Chapter 14)
+* __Reference:__ https://robjhyndman.com/hyndsight/nnetar-prediction-intervals/ (Time series modeling, Neural network)
+* __Reference:__ Shumway, R. H., & Stoffer, D. S. (2017). Time series analysis and its applications: with R examples. 4th edition (p.265-270, ch.5, p.396, ch.7).
+* __Reference:__ University of Toronto, STA 457, Ljung Box test codes, Prewhitening process taught/codes provided in 2020 Fall term by Kyuson.Lim. 
+
+
