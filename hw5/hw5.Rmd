@@ -838,4 +838,12 @@ In this cases, we could also come up with simulations on different model to cons
 * __Reference:__ Shumway, R. H., & Stoffer, D. S. (2017). Time series analysis and its applications: with R examples. 4th edition (p.265-270, ch.5, p.396, ch.7).
 * __Reference:__ University of Toronto, STA 457, Ljung Box test codes, Prewhitening process taught/codes provided in 2020 Fall term by Kyuson.Lim. 
 
+JD: Obviously a lot of good stuff here, but not very clear explication of dataviz. I'm not sure at all why there are so many similar plots, why there are plots with peaks and valleys picked out, what is seen as the advantage of the tooltips on the early plotlys… Why are there two different smoothers in plot_4? How should the reader interpret them?
 
+For m3, you would probably be better to use poly() for smoothing (it should give the same smooth, but it's better code, and also more efficient and robust).
+
+I'm not sure why you're doing so many tests, nor how you are interpreting the Shapiro-Wilks test. It is never true that you can't do a model _because_ SW is significant. You should _always_ assume your data are not _exactly_ normal. The SW statistic is a better guide of whether they're close to normal than the P value is. 
+
+I don't understand why there are mini-plots under many of your plots.
+
+Grade: 2.2/3
