@@ -160,7 +160,8 @@ LBTest<- function(res, nPQ = 0, m = 36, ifPlot = FALSE){
 
 
 ```{r, message=F, echo=T}
-setwd("/Users/kyusoinlims/Desktop/STATS 744")
+## BMB: don't do this!
+##setwd("/Users/kyusoinlims/Desktop/STATS 744")
 #d at<-ts(read.csv(file.choose()))
 dat<-ts(read.csv('day.csv'))
 
@@ -847,3 +848,21 @@ I'm not sure why you're doing so many tests, nor how you are interpreting the Sh
 I don't understand why there are mini-plots under many of your plots.
 
 Grade: 2.2/3
+
+BMB: second opinions.
+
+* it took me a little bit of extra effort to replicate this: I had to find one package on GitHub and install it from there (`remotes::install_github("flr/ggplotFL")`) and eliminate a hard-coded `setwd()` (don't do this!)
+* my main impression about your dynamic graphs is that they don't really add much insight to the existing static graphs: they mainly serve as a way to view the precise values displayed in the graph, which is good, but doesn't tell me anything qualitatively new.  For example:
+   * first interactive lot (time series + smooth): the hovertext for the data trace has too many significant digits for the temperature (e.g. "Temperature: 0.7233330"). The hovertext for the smoothed line also has too many significant digits, and the time is expressed as a numeric value rather than a date; the hovertext for the confidence intervals has the right level of detail for the temperature, but the time is again expressed in a way that's basically impossible to interpret.
+   * the next plot is similar
+   * the hovertext for the points in the next two graphs have elements "x-label" (date), "x" (numeric equivalent), "y" (temperature, too many digits), "Timeline" (date), "Temperature" (redundant with y)
+   
+* Do you mean "casual" users in your initial text? It's very confusing because "causal inference" is also a thing in statistics, I initially thought you were referring to some weird form of causal inference on time series. (People usually make the opposite mistake, misspelling "causal" as "casual")
+
+* plot with orange 'linear prediction' line (I understand where this comes from, but it's initially confusing to have a legend where "linear" refers to a curve that is obviously nonlinear ...) - consider truncating the axes at 0, unless you're trying to emphasize the unrealistic extrapolation properties? (On the stats side, I would seriously consider doing all of this analysis on the log scale)
+
+* Q-Q plot: similar point about hovertext details (too many digits, "x" and "sample" are redundant)
+
+* dygraphs: the zoom feature is very useful, but the hovertexts once again don't do more than give a lookup capability
+
+Bottom line: you didn't need to do all this work! You could just have shown us a few of the plots, explained what they were, and explained how/why making them dynamic instead of static was useful. The bad part of doing all the work is that it makes a lot for us to read through. You did get a mark of greater than 2: a mark of 2 corresponds to 'satisfied the requirements of the assignment', which you certainly did. However ... while this is a perfectly *acceptable* solution to the homework, and may be excellent from a statistical or predictive-analytics point of view, it is not excellent from a data visualization point of view.
